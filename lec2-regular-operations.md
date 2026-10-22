@@ -1,6 +1,6 @@
 # Complexity Theory — Lecture 2: Operations on Regular Languages
 
-> ⚠️ Some parts were written **ahead of the lecture**. Check them against the doctor's version.
+> ⚠️ The NFA preview in Section 6 was written **ahead of the lecture** and will be covered properly in a later lecture.
 
 ---
 
@@ -434,7 +434,9 @@ flowchart LR
 ### Example 3: a finite language, L = {010, 1}
 Σ = {0, 1}. The DFA must accept **exactly two strings**, `010` and `1`, and reject **everything else**.
 
-**Idea:** build a **path for each string**, one state per prefix read so far. Anything that leaves those paths goes to the **sink**.
+**Idea:** build a **path for each string**, one state per prefix read so far. Every "wrong" arrow goes to a sink.
+
+#### Step 1: without sharing (a separate sink for every wrong arrow)
 
 | State | Prefix read so far | Accept? |
 |---|---|---|
@@ -443,7 +445,52 @@ flowchart LR
 | q2 | `01` | ❌ |
 | q3 | `010` | ✅ |
 | q4 | `1` | ✅ |
-| sink | anything else | ❌ |
+| s1, s2, s3, s4 | wrong symbol, so it can never be accepted | ❌ |
+
+```mermaid
+flowchart LR
+    start([start]) --> q0((q0))
+    q0 -- 0 --> q1((q1))
+    q1 -- 1 --> q2((q2))
+    q2 -- 0 --> q3(((q3)))
+    q0 -- 1 --> q4(((q4)))
+    q1 -- 0 --> s1((s1))
+    q2 -- 1 --> s2((s2))
+    q3 -- "0,1" --> s3((s3))
+    q4 -- "0,1" --> s4((s4))
+    s1 -- "0,1" --> s1
+    s2 -- "0,1" --> s2
+    s3 -- "0,1" --> s3
+    s4 -- "0,1" --> s4
+```
+
+| δ | 0 | 1 |
+|---|---|---|
+| → q0 | q1 | q4 |
+| q1 | s1 | q2 |
+| q2 | q3 | s2 |
+| \* q3 | s3 | s3 |
+| \* q4 | s4 | s4 |
+| s1 | s1 | s1 |
+| s2 | s2 | s2 |
+| s3 | s3 | s3 |
+| s4 | s4 | s4 |
+
+This version has **9 states** (18 transitions). It is correct, but large.
+
+**Verify**
+
+| String | Path | Result |
+|---|---|---|
+| `1` | q0 → q4 | ✅ |
+| `010` | q0 → q1 → q2 → q3 | ✅ |
+| ε | q0 | ❌ |
+| `01` | q0 → q1 → q2 | ❌ (incomplete) |
+| `11` | q0 → q4 → s4 | ❌ |
+| `0101` | q0 → q1 → q2 → q3 → s3 | ❌ (too long) |
+
+#### Step 2: share the sink (merge s1, s2, s3, s4 into one sink)
+All four sinks are non-accepting and loop on 0,1 forever, so they **behave identically**. **One shared sink is enough.**
 
 ```mermaid
 flowchart LR
@@ -459,31 +506,197 @@ flowchart LR
     s -- "0,1" --> s
 ```
 
+9 states → **6 states**.
+
+#### Step 3: share the accept state (merge q3 and q4 into qf)
+q3 and q4 are **both accepting** and **both send 0 and 1 to the sink**. They behave identically, so we merge them into **qf**.
+
+```mermaid
+flowchart LR
+    start([start]) --> q0((q0))
+    q0 -- 0 --> q1((q1))
+    q1 -- 1 --> q2((q2))
+    q2 -- 0 --> qf(((qf)))
+    q0 -- 1 --> qf
+    q1 -- 0 --> s((sink))
+    q2 -- 1 --> s
+    qf -- "0,1" --> s
+    s -- "0,1" --> s
+```
+
 | δ | 0 | 1 |
 |---|---|---|
-| → q0 | q1 | q4 |
+| → q0 | q1 | qf |
 | q1 | sink | q2 |
-| q2 | q3 | sink |
-| \* q3 | sink | sink |
-| \* q4 | sink | sink |
+| q2 | qf | sink |
+| \* qf | sink | sink |
 | sink | sink | sink |
 
-- 6 states × 2 symbols = **12 transitions**.
-- The accept states q3 and q4 send **everything** to the sink, because any extra symbol makes the string longer than `010` or `1`.
-- If the sink is hidden, only the 4 path arrows are drawn: q0→q1, q1→q2, q2→q3, and q0→q4.
+6 states → **5 states** (10 transitions), and it still accepts the same language.
+- `1`: q0 → **qf** ✅ · `010`: q0 → q1 → q2 → **qf** ✅ · `11`: q0 → qf → sink ❌
+
+#### Step 4: try to merge the remaining states, step by step
+The remaining non-accepting states are q0, q1, q2 (and the sink). For each pair, compare the arrows. If **any** arrow differs, they **cannot** be merged.
+
+| Pair | on 0 | on 1 | Merge? |
+|---|---|---|---|
+| q0 vs q1 | q1 vs sink | qf vs q2 | ❌ different |
+| q0 vs q2 | q1 vs qf | qf vs sink | ❌ different |
+| q1 vs q2 | sink vs qf | q2 vs sink | ❌ different |
+| q0 / q1 / q2 vs sink | — | the sink never leaves itself, but each of q0, q1, q2 can still reach qf | ❌ different |
+| qf vs anything else | — | qf is the only **accept** state | ❌ different |
+
+You can also check with a string. For example, q1 and q2 are different because reading `10` from q1 gives q1 → q2 → **qf** ✅, while from q2 it gives q2 → **sink** ❌.
+
+No more merges are possible, so **5 states is the smallest DFA** for {010, 1}.
+
+| Version | # states |
+|---|---|
+| No sharing | 9 |
+| Shared sink | 6 |
+| Shared sink + shared accept | **5** (minimal) |
+
+> 📌 **When can two states be merged?** When they are **both accepting (or both non-accepting)** and they go to the **same states on every symbol**. Merging them gives a smaller DFA for the same language.
+
+> 📌 **Every finite language is regular:** you can always build a DFA like this one, with one path per string and a sink for everything else.
+
+### Example 4: strings that **end with `01`**
+Σ = {0, 1}, L = { w | w ends with `01` }
+
+**Idea:** remember the **last symbols** read, i.e. how much of `01` we have just seen.
+
+| State | Meaning | Accept? |
+|---|---|---|
+| q0 (start) | no progress: nothing read yet, or the string ends in a `1` that doesn't complete `01` | ❌ |
+| q1 | the last symbol is `0`, so we have seen the "0" of `01` | ❌ |
+| q2 | the last two symbols are `01` | ✅ |
+
+```mermaid
+flowchart LR
+    start([start]) --> q0((q0))
+    q0 -- 1 --> q0
+    q0 -- 0 --> q1((q1))
+    q1 -- 0 --> q1
+    q1 -- 1 --> q2(((q2)))
+    q2 -- 0 --> q1
+    q2 -- 1 --> q0
+```
+
+| δ | 0 | 1 |
+|---|---|---|
+| → q0 | q1 | q0 |
+| q1 | q1 | q2 |
+| \* q2 | q1 | q0 |
+
+How q2's arrows work, since this is the tricky part:
+- q2 on **0**: the string now ends in `0`, which could start a new `01`, so go to **q1**.
+- q2 on **1**: the string now ends in `11`, which means no progress, so go back to **q0**.
+
+**No sink here.** A string that doesn't end in `01` can always be **fixed** by adding more symbols, so there is no state you can never escape.
 
 **Verify**
 
 | String | Path | Result |
 |---|---|---|
-| `1` | q0 → q4 | ✅ |
-| `010` | q0 → q1 → q2 → q3 | ✅ |
+| `01` | q0 → q1 → q2 | ✅ |
+| `1001` | q0 → q0 → q1 → q1 → q2 | ✅ |
+| `0101` | q0 → q1 → q2 → q1 → q2 | ✅ |
+| `010` | q0 → q1 → q2 → q1 | ❌ (ends in 0) |
+| `011` | q0 → q1 → q2 → q0 | ❌ (ends in 11) |
 | ε | q0 | ❌ |
-| `01` | q0 → q1 → q2 | ❌ (incomplete) |
-| `11` | q0 → q4 → sink | ❌ |
-| `0101` | q0 → q1 → q2 → q3 → sink | ❌ (too long) |
 
-> 📌 **Every finite language is regular:** you can always build a DFA like this one, with one path per string and a sink for everything else.
+> ⚠️ **"Ends with 01" ≠ "contains 01"** (Lecture 1, Example 4). In "contains", q2 **stays** accepting forever (loop 0,1). In "ends with", q2 must **leave** when another symbol comes in.
+
+### Example 5: union using the table, A = odd 0s, B = ends in `01`
+Σ = {0, 1}
+- **A** = binary strings with an **odd number of 0s**
+- **B** = binary strings that **end in `01`** (Example 4)
+- **C = A ∪ B** = odd 0s **OR** ends in `01`
+
+We build it with the **transition table**, the same way you fill a truth table: list every combined state as a row, then fill the 0 and 1 columns.
+
+#### Step 1: the two DFAs as tables
+
+**M_A (odd 0s):** a = even 0s (start), b = odd 0s (accept). A `0` switches a ↔ b, and a `1` stays.
+
+| δ_A | 0 | 1 |
+|---|---|---|
+| → a | b | a |
+| \* b | a | b |
+
+**M_B (ends in 01):** from Example 4.
+
+| δ_B | 0 | 1 |
+|---|---|---|
+| → q0 | q1 | q0 |
+| q1 | q1 | q2 |
+| \* q2 | q1 | q0 |
+
+#### Step 2: combined states = 2 × 3 = 6 rows
+Start = **(a, q0)**.
+
+#### Step 3: fill the table
+For each row, look up **δ_A** for the first part and **δ_B** for the second part:
+
+| Combined state | on 0 | on 1 | A accepts (b)? | B accepts (q2)? | **C = A ∪ B** (OR) |
+|---|---|---|---|---|---|
+| → (a, q0) | (b, q1) | (a, q0) | ❌ | ❌ | ❌ |
+| (a, q1) | (b, q1) | (a, q2) | ❌ | ❌ | ❌ |
+| (a, q2) | (b, q1) | (a, q0) | ❌ | ✅ | ✅ |
+| (b, q0) | (a, q1) | (b, q0) | ✅ | ❌ | ✅ |
+| (b, q1) | (a, q1) | (b, q2) | ✅ | ❌ | ✅ |
+| (b, q2) | (a, q1) | (b, q0) | ✅ | ✅ | ✅ |
+
+Example of filling one cell, (a, q1) on `1`: δ_A(a, 1) = a and δ_B(q1, 1) = q2, so the result is **(a, q2)**.
+
+**Accept (union):** any row with **b OR q2**, which gives 4 accept states. Only **(a, q0)** and **(a, q1)** reject.
+
+#### The box
+
+```
+                    q0           q1           q2 (ends 01)
+                ┌────────────┬────────────┬────────────┐
+ start ──▶ a    │ ▶(a,q0) ❌ │  (a,q1) ❌ │  (a,q2) ✅ │
+ (even 0s)      ├────────────┼────────────┼────────────┤
+           b    │  (b,q0) ✅ │  (b,q1) ✅ │  (b,q2) ✅ │
+ (odd 0s)       └────────────┴────────────┴────────────┘
+```
+
+#### The union DFA
+
+```mermaid
+flowchart LR
+    start([start]) --> A0(("a,q0"))
+    A0 -- 1 --> A0
+    A0 -- 0 --> B1((("b,q1")))
+    A1(("a,q1")) -- 0 --> B1
+    A1 -- 1 --> A2((("a,q2")))
+    A2 -- 0 --> B1
+    A2 -- 1 --> A0
+    B0((("b,q0"))) -- 0 --> A1
+    B0 -- 1 --> B0
+    B1 -- 0 --> A1
+    B1 -- 1 --> B2((("b,q2")))
+    B2 -- 0 --> A1
+    B2 -- 1 --> B0
+```
+
+6 states × 2 symbols = 12 transitions.
+
+#### Verify
+
+| String | Path | Ends at | DFA | # 0s / ends 01? | Expected (odd 0s OR ends 01) |
+|---|---|---|---|---|---|
+| ε | (a,q0) | (a,q0) | ❌ | 0 / no | ❌ |
+| `0` | (a,q0)→(b,q1) | (b,q1) | ✅ | 1 / no | ✅ |
+| `01` | (a,q0)→(b,q1)→(b,q2) | (b,q2) | ✅ | 1 / yes | ✅ |
+| `001` | (a,q0)→(b,q1)→(a,q1)→(a,q2) | (a,q2) | ✅ | 2 / yes | ✅ |
+| `100` | (a,q0)→(a,q0)→(b,q1)→(a,q1) | (a,q1) | ❌ | 2 / no | ❌ |
+| `11` | (a,q0)→(a,q0)→(a,q0) | (a,q0) | ❌ | 0 / no | ❌ |
+
+All rows match ✔️
+
+> **For intersection (odd 0s AND ends in 01):** use the same table, and accept only **(b, q2)**. Check: `01` ✅ (one 0, ends 01), but `001` ❌ (two 0s).
 
 ---
 
@@ -498,6 +711,19 @@ flowchart LR
 
 - Regular languages are **closed** under all of these operations.
 - A ∘ B ≠ B ∘ A. ε is always in A\*.
+
+### DFA design patterns (Section 7)
+
+| Language type | Pattern | Example |
+|---|---|---|
+| Even/odd count of a symbol | 2 states; that symbol switches between them, other symbols loop | odd a's |
+| At most k of a symbol | k+1 accept states counting up, then a sink | at most three 1s |
+| Finite language | One path per string, a shared sink, merged accept states | {010, 1} |
+| Ends with a pattern | Track the progress so far; the accept state must **leave** on new input | ends in 01 |
+| Two conditions (OR / AND) | Combined states, filled as a table like a truth table | odd 0s ∪ ends in 01 |
+
+- **Merge** two states when both have the same accept status and the same arrows on every symbol.
+- **Always verify** a few accepted and rejected strings.
 
 ---
 
@@ -518,6 +744,12 @@ flowchart LR
 **Q5.** Complement the DFA "contains `01`" (Lecture 1, Example 4). Is a sink needed?
 <details><summary>Answer</summary>No, every state already has both arrows. Flip the states: q0 and q1 accept, q2 doesn't. The result is the strings with no `01`, i.e. some 1s followed by some 0s.</details>
 
+**Q6.** Build a DFA for "at most two 0s" over {0,1}. How many states does it have?
+<details><summary>Answer</summary>4: three accept states (0, 1, or 2 zeros) plus a sink. Each state loops on 1, and a 0 moves one step forward.</details>
+
+**Q7.** Build a DFA for the finite language {1, 11}. Which states can be merged?
+<details><summary>Answer</summary>Path: q0 →1→ q1 (✅) →1→ q2 (✅) →1→ sink, and q0 →0→ sink, q1 →0→ sink, q2 →0→ sink. q1 and q2 are both accepting, but on 1, q1 goes to q2 while q2 goes to the sink, so they **can't** be merged. 4 states.</details>
+
 ---
 
-*(To be continued...)*
+*End of Lecture 2*
