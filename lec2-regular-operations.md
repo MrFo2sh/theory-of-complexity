@@ -20,6 +20,37 @@
 | **Combined state** | A pair (state of M_A, state of M_B), used in union and intersection |
 | **Closed under X** | Applying X to regular languages gives a regular language |
 
+### The transition function δ as a table
+The transition function can be written as a **table**, similar to a **truth table**:
+- **rows** = the states (q0, q1, q2)
+- **columns** = the symbols of Σ (0, 1)
+- **each cell** = δ(state, symbol), i.e. the next state
+
+**Example:** "contains `01`" (Lecture 1, Example 4), with Q = {q0, q1, q2} and Σ = {0, 1}
+
+| δ | **0** | **1** |
+|---|---|---|
+| → q0 | q1 | q0 |
+| q1 | q1 | q2 |
+| \* q2 | q2 | q2 |
+
+Read the cells as δ(q0, 0) = q1, δ(q0, 1) = q0, δ(q1, 1) = q2, and so on.
+
+```mermaid
+flowchart LR
+    start([start]) --> q0((q0))
+    q0 -- 1 --> q0
+    q0 -- 0 --> q1((q1))
+    q1 -- 0 --> q1
+    q1 -- 1 --> q2(((q2)))
+    q2 -- "0,1" --> q2
+```
+
+- `→` marks the start state and `*` marks an accept state.
+- **Table size** = |Q| rows × |Σ| columns = 3 × 2 = **6 cells = 6 transitions**.
+- In a DFA, **every cell holds exactly one state**. An empty cell would mean a hidden sink.
+- The table and the diagram show **the same DFA**. Use whichever is easier.
+
 ---
 
 ## 1. The Operations
@@ -237,7 +268,45 @@ All rows match ✔️
 
 > 📌 **The same box and the same arrows as the union.** Only the accept rule changes: a combined state is accepting if **both** parts are accept states (**AND**).
 
-In the example above, A ∩ B = even 1s **and** odd 0s, so the only accept state is **(a,d)**.
+### Example (from the lecture): A ∩ B = even 1s **AND** odd 0s
+Use the same A and B as in Section 4. A string is accepted **only if both** conditions hold: an **even number of 1s** and an **odd number of 0s**.
+
+```
+A ∩ B = { 0, 000, 011, 101, 110, 00000, ... }
+```
+
+**The box.** Same combined states and same arrows. The only accepting state is **(a,d)**, because it is the only one where both parts are accept states.
+
+```
+                          c (even 0s)     d (odd 0s)
+                        ┌──────────────┬──────────────┐
+ start ──▶ a (even 1s)  │ ▶(a,c)  ❌   │  (a,d)  ✅   │
+                        ├──────────────┼──────────────┤
+           b (odd 1s)   │  (b,c)  ❌   │  (b,d)  ❌   │
+                        └──────────────┴──────────────┘
+```
+
+| Combined state | on 0 | on 1 | a accepts? | d accepts? | **∩ accepts?** |
+|---|---|---|---|---|---|
+| → (a,c) | (a,d) | (b,c) | ✅ | ❌ | ❌ |
+| (a,d) | (a,c) | (b,d) | ✅ | ✅ | ✅ |
+| (b,c) | (b,d) | (a,c) | ❌ | ❌ | ❌ |
+| (b,d) | (b,c) | (a,d) | ❌ | ✅ | ❌ |
+
+**Verify**
+
+| String | Path | Ends at | DFA | # 1s / # 0s | Expected |
+|---|---|---|---|---|---|
+| ε | (a,c) | (a,c) | ❌ | 0 / 0 | even 0s ❌ |
+| `0` | (a,c)→(a,d) | (a,d) | ✅ | 0 / 1 | both ✅ |
+| `00` | (a,c)→(a,d)→(a,c) | (a,c) | ❌ | 0 / 2 | even 0s ❌ |
+| `10` | (a,c)→(b,c)→(b,d) | (b,d) | ❌ | 1 / 1 | odd 1s ❌ |
+| `110` | (a,c)→(b,c)→(a,c)→(a,d) | (a,d) | ✅ | 2 / 1 | both ✅ |
+| `0110` | (a,c)→(a,d)→(b,d)→(a,d)→(a,c) | (a,c) | ❌ | 2 / 2 | even 0s ❌ |
+
+All rows match ✔️
+
+> **Observation:** even 1s + odd 0s always gives an **odd length**. So no string of even length is ever in A ∩ B (for example, ε, `00`, `10`, `0110`).
 
 | Operation | Combined state (x, y) is accepting when |
 |---|---|
@@ -268,7 +337,157 @@ The constructions use **ε-arrows**, which move to another state without reading
 
 ---
 
-## 7. Summary
+## 7. DFA Examples
+
+### Example 1: strings with **at most three 1s**
+Σ = {0, 1}, L = { w | w contains **at most three** 1s }, i.e. 0, 1, 2, or 3 ones
+
+**Idea:** count the 1s. The `0`s don't matter, so each state loops on 0.
+
+| State | Meaning | Accept? |
+|---|---|---|
+| q0 (start) | 0 ones so far | ✅ |
+| q1 | 1 one | ✅ |
+| q2 | 2 ones | ✅ |
+| q3 | 3 ones | ✅ |
+| sink | 4 or more ones, so it can never be fixed | ❌ |
+
+```mermaid
+flowchart LR
+    start([start]) --> q0(((q0)))
+    q0 -- 0 --> q0
+    q0 -- 1 --> q1(((q1)))
+    q1 -- 0 --> q1
+    q1 -- 1 --> q2(((q2)))
+    q2 -- 0 --> q2
+    q2 -- 1 --> q3(((q3)))
+    q3 -- 0 --> q3
+    q3 -- 1 --> s((sink))
+    s -- "0,1" --> s
+```
+
+**Transition table**
+
+| δ | 0 | 1 |
+|---|---|---|
+| → \* q0 | q0 | q1 |
+| \* q1 | q1 | q2 |
+| \* q2 | q2 | q3 |
+| \* q3 | q3 | sink |
+| sink | sink | sink |
+
+- **4 accept states** (q0 to q3) and **1 sink**: 5 states × 2 symbols = 10 transitions.
+- The sink is drawn here. If it were hidden, q3 would have no 1-arrow.
+
+**Verify**
+
+| String | Path | # 1s | Result |
+|---|---|---|---|
+| ε | q0 | 0 | ✅ |
+| `0000` | q0 → q0 → q0 → q0 → q0 | 0 | ✅ |
+| `10101` | q0 → q1 → q1 → q2 → q2 → q3 | 3 | ✅ |
+| `0110` | q0 → q0 → q1 → q2 → q2 | 2 | ✅ |
+| `1111` | q0 → q1 → q2 → q3 → sink | 4 | ❌ |
+| `110110` | q0 → q1 → q2 → q2 → q3 → sink → sink | 4 | ❌ |
+
+> **Bonus (complement):** "at least four 1s" is the same DFA with the accept states flipped. Only the **sink** is accepting there, which is why the sink must be drawn.
+
+### Example 2: L_A = strings with an **odd number of a's**
+Σ = {a, b} (the alphabet doesn't have to be {0, 1}).
+
+**Idea:** track whether the number of a's is even or odd. An `a` switches the state, and a `b` changes nothing.
+
+| State | Meaning | Accept? |
+|---|---|---|
+| q0 (start) | even a's so far (zero a's is even) | ❌ |
+| q1 | odd a's so far | ✅ |
+
+```mermaid
+flowchart LR
+    start([start]) --> q0((q0))
+    q0 -- b --> q0
+    q0 -- a --> q1(((q1)))
+    q1 -- b --> q1
+    q1 -- a --> q0
+```
+
+| δ | a | b |
+|---|---|---|
+| → q0 | q1 | q0 |
+| \* q1 | q0 | q1 |
+
+- **No sink is needed:** every state already has an `a`-arrow and a `b`-arrow.
+- 2 states × 2 symbols = 4 transitions.
+
+**Verify**
+
+| String | Path | # a's | Result |
+|---|---|---|---|
+| ε | q0 | 0 | ❌ |
+| `a` | q0 → q1 | 1 | ✅ |
+| `bab` | q0 → q0 → q1 → q1 | 1 | ✅ |
+| `aba` | q0 → q1 → q1 → q0 | 2 | ❌ |
+| `aaab` | q0 → q1 → q0 → q1 → q1 | 3 | ✅ |
+
+> This is the same shape as M_B in Section 4 ("odd 0s"), with `a` in place of `0` and `b` in place of `1`.
+
+### Example 3: a finite language, L = {010, 1}
+Σ = {0, 1}. The DFA must accept **exactly two strings**, `010` and `1`, and reject **everything else**.
+
+**Idea:** build a **path for each string**, one state per prefix read so far. Anything that leaves those paths goes to the **sink**.
+
+| State | Prefix read so far | Accept? |
+|---|---|---|
+| q0 (start) | ε | ❌ |
+| q1 | `0` | ❌ |
+| q2 | `01` | ❌ |
+| q3 | `010` | ✅ |
+| q4 | `1` | ✅ |
+| sink | anything else | ❌ |
+
+```mermaid
+flowchart LR
+    start([start]) --> q0((q0))
+    q0 -- 0 --> q1((q1))
+    q1 -- 1 --> q2((q2))
+    q2 -- 0 --> q3(((q3)))
+    q0 -- 1 --> q4(((q4)))
+    q1 -- 0 --> s((sink))
+    q2 -- 1 --> s
+    q3 -- "0,1" --> s
+    q4 -- "0,1" --> s
+    s -- "0,1" --> s
+```
+
+| δ | 0 | 1 |
+|---|---|---|
+| → q0 | q1 | q4 |
+| q1 | sink | q2 |
+| q2 | q3 | sink |
+| \* q3 | sink | sink |
+| \* q4 | sink | sink |
+| sink | sink | sink |
+
+- 6 states × 2 symbols = **12 transitions**.
+- The accept states q3 and q4 send **everything** to the sink, because any extra symbol makes the string longer than `010` or `1`.
+- If the sink is hidden, only the 4 path arrows are drawn: q0→q1, q1→q2, q2→q3, and q0→q4.
+
+**Verify**
+
+| String | Path | Result |
+|---|---|---|
+| `1` | q0 → q4 | ✅ |
+| `010` | q0 → q1 → q2 → q3 | ✅ |
+| ε | q0 | ❌ |
+| `01` | q0 → q1 → q2 | ❌ (incomplete) |
+| `11` | q0 → q4 → sink | ❌ |
+| `0101` | q0 → q1 → q2 → q3 → sink | ❌ (too long) |
+
+> 📌 **Every finite language is regular:** you can always build a DFA like this one, with one path per string and a sink for everything else.
+
+---
+
+## 8. Summary
 
 | Operation | Technique | # states |
 |---|---|---|
@@ -282,7 +501,7 @@ The constructions use **ε-arrows**, which move to another state without reading
 
 ---
 
-## 8. Practice
+## 9. Practice
 
 **Q1.** A = {1, 01}, B = {0, 1}. Find A ∘ B and A ∩ B.
 <details><summary>Answer</summary>A ∘ B = {10, 11, 010, 011}, A ∩ B = {1}</details>
